@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Career Compass Chatbot</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 10px; }
+    #chat-area { height: 350px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
+    .user { color: #2c3e50; }
+    .bot { color: #2980b9; }
+  </style>
+</head>
+<body>
+  <div id="chat-area"></div>
+  <input id="question" placeholder="Type your question..." style="width:75%;">
+  <button onclick="ask()">Ask</button>
+
+  <script>
+    const chat = document.getElementById("chat-area");
+
+    async function ask() {
+      const q = document.getElementById("question").value;
+      chat.innerHTML += `<div class="user"><b>You:</b> ${q}</div>`;
+      const res = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q })
+      });
+      const data = await res.json();
+      chat.innerHTML += `<div class="bot"><b>Bot:</b> ${data.answer}</div>`;
+      document.getElementById("question").value = "";
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+</html>
+<script src="{{ url_for('static', path='/js/main.js') }}"></script>

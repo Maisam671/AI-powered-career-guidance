@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+openai
+weaviate-client
+langchain
+langchain-community
+langchain-weaviate
+sentence-transformers
+pandas
+numpy
