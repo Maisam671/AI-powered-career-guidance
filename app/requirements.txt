@@ -8,3 +8,4 @@ langchain-weaviate
 sentence-transformers
 pandas
 numpy
+python-dotenv
