@@ -1,4 +1,33 @@
+# .dockerignore
+
+# Virtual environments
+venv/
+myvenv/
+.venv/
+
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Git
+.git/
+.gitignore
+
+# Environment files
 .env
-.git
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Large files (adjust as needed)
+# final_merged_career_guidance.csv  # Uncomment if this file is large

@@ -1,24 +1,21 @@
-# Use a lightweight Python image
+# Dockerfile
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy dependencies
-COPY app/requirements.txt .
-
-# Install dependencies
+# Copy requirements and install dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app code
-COPY app .
+# Copy the entire application
+COPY app/ ./app/
+COPY models/ ./models/
 
-# Expose FastAPI port
+# Copy environment template (for reference)
+COPY .env.example ./.env.example
+
+# Expose port
 EXPOSE 8000
 
-# Set environment variables
-ENV OPENAI_API_KEY=${OPENAI_API_KEY}
-ENV WEAVIATE_CLOUD_URL=${WEAVIATE_CLOUD_URL}
-ENV WEAVIATE_API_KEY=${WEAVIATE_API_KEY}
-
-# Run the FastAPI server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Command to run the application
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

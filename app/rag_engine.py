@@ -10,9 +10,9 @@ from langchain.text_splitter import TokenTextSplitter
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
-   
-llm_client = OpenAI()
 load_dotenv()
+llm_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 class CareerCompassWeaviate:
     def __init__(self):
         self.client = None
