@@ -3,60 +3,56 @@ import joblib
 import numpy as np
 from fuzzywuzzy import process, fuzz
 from sklearn.preprocessing import MultiLabelBinarizer, OneHotEncoder, LabelEncoder
+
+logger = logging.getLogger(__name__)
+
+# Global models variable with lazy loading
+_models = None
+
 def get_models():
     global _models
     if _models is None:
+        logger.info("🔄 Loading ML models...")
         _models = load_models()
     return _models
-# Load all models and encoders
+
 def load_models():
-    models = {}
+    """Load models with minimal memory footprint"""
     try:
-        models['model'] = joblib.load('models/models/major_recommendation_model.pkl')
-        models['mlb_skills'] = joblib.load('models/models/mlb_skills.pkl')
-        models['mlb_courses'] = joblib.load('models/models/mlb_courses.pkl')
-        models['ohe_work_style'] = joblib.load('models/models/ohe_work_style.pkl')
-        models['ohe_passion'] = joblib.load('models/models/ohe_passion.pkl')
-        models['le_major'] = joblib.load('models/models/le_major.pkl')
-        models['le_faculty'] = joblib.load('models/models/le_faculty.pkl')
-        models['le_degree'] = joblib.load('models/models/le_degree.pkl')
-        models['le_campus'] = joblib.load('models/models/le_campus.pkl')
+        models = {}
+        base_path = "models/models/"
         
-        # Load master lists
-        models['all_skills'] = joblib.load('models/models/master_skills.pkl')
-        models['all_courses'] = joblib.load('models/models/master_courses.pkl')
-        models['all_passions'] = joblib.load('models/models/master_passions.pkl')
-        models['all_work_styles'] = joblib.load('models/models/master_work_styles.pkl')
+        # Only load essential models
+        essential_models = [
+            'major_recommendation_model.pkl',
+            'mlb_skills.pkl', 
+            'mlb_courses.pkl',
+            'ohe_work_style.pkl',
+            'ohe_passion.pkl',
+            'le_major.pkl',
+            'le_faculty.pkl', 
+            'le_degree.pkl',
+            'le_campus.pkl',
+            'master_skills.pkl',
+            'master_courses.pkl',
+            'master_passions.pkl',
+            'master_work_styles.pkl'
+        ]
         
-        # Add common variations
-        models['all_skills'].extend([
-            'Power BI', 'PowerBI', 'Data Analysis', 'Data Analytics', 'Business Intelligence',
-            'AI', 'Artificial Intelligence', 'Machine Learning', 'Deep Learning',
-            'Programming', 'Coding', 'Software Development', 'Web Development'
-        ])
+        for model_file in essential_models:
+            key = model_file.replace('.pkl', '').replace('master_', '')
+            if 'master_' in model_file:
+                key = f"all_{key}"
+            models[key] = joblib.load(f'{base_path}{model_file}')
+            logger.info(f"✅ Loaded {model_file}")
         
-        models['all_courses'].extend([
-            'Mathematics', 'Math', 'Advanced Mathematics', 'Applied Mathematics',
-            'AI', 'Artificial Intelligence', 'Machine Learning', 'Data Science'
-        ])
-        
-        models['all_passions'].extend([
-            'AI', 'Artificial Intelligence', 'Machine Learning', 'Technology',
-            'Data Science', 'Programming', 'Computer Science'
-        ])
-        
-        # Remove duplicates
-        models['all_skills'] = list(set(models['all_skills']))
-        models['all_courses'] = list(set(models['all_courses']))
-        models['all_passions'] = list(set(models['all_passions']))
-        
-        print(f"✅ Loaded {len(models['all_skills'])} skills, {len(models['all_courses'])} courses, {len(models['all_passions'])} passions")
+        logger.info("🎯 All ML models loaded successfully")
         return models
+        
     except Exception as e:
-        print(f"❌ Error loading models: {e}")
+        logger.error(f"❌ Error loading models: {e}")
         return None
 
-models = load_models()
 
 def process_user_text_input(user_input, master_list, input_type="skills"):
     """
