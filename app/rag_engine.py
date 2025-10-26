@@ -11,13 +11,18 @@ from openai import OpenAI
 import os
 from dotenv import load_dotenv
 load_dotenv()
-llm_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 class CareerCompassWeaviate:
     def __init__(self):
         self.client = None
         self.vectorstore = None
-        self.llm_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Initialize OpenAI client only when needed
+        self._llm_client = None
+    
+    @property
+    def llm_client(self):
+        if self._llm_client is None:
+            self._llm_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        return self._llm_client
     
     # --- 1️⃣ Connect to Weaviate Cloud ---
     def _initialize_weaviate_client(self):

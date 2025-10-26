@@ -3,7 +3,11 @@ import joblib
 import numpy as np
 from fuzzywuzzy import process, fuzz
 from sklearn.preprocessing import MultiLabelBinarizer, OneHotEncoder, LabelEncoder
-
+def get_models():
+    global _models
+    if _models is None:
+        _models = load_models()
+    return _models
 # Load all models and encoders
 def load_models():
     models = {}
@@ -198,6 +202,7 @@ def predict_major(user_data):
     """
     Predict major based on user input
     """
+    models = get_models()
     if not models:
         return {"error": "Models not loaded. Please train the model first."}
     

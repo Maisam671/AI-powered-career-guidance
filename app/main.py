@@ -19,6 +19,9 @@ templates = Jinja2Templates(directory="app/templates")
 # Initialize RAG system
 career_system = CareerCompassWeaviate()
 career_system.initialize_system("app/final_merged_career_guidance.csv")
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 # Home page - ML Recommendation
 @app.get("/", response_class=HTMLResponse)
