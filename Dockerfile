@@ -13,6 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the entire app folder into the container
 COPY app ./app
 COPY models ./models
+COPY app/final_merged_career_guidance.csv ./app/final_merged_career_guidance.csv
+
 # Copy the .env file if you want to use it locally (Render uses environment variables instead)
 #COPY .env .env
 
