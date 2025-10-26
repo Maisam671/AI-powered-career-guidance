@@ -22,7 +22,10 @@ career_system.initialize_system("app/final_merged_career_guidance.csv")
 @app.get("/health")
 def health():
     return {"status": "ok"}
+<<<<<<< HEAD
 
+=======
+>>>>>>> 20e9b2743e5dee7a1f93a29262def00923205a33
 # Home page - ML Recommendation
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -94,3 +97,7 @@ async def predict(
     except Exception as e:
         print(f"❌ Error in predict endpoint: {e}")
         return JSONResponse({"success": False, "error": str(e)})
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
