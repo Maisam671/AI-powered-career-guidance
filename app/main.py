@@ -28,15 +28,15 @@ def health():
 async def home(request: Request):
     work_styles = ["Team-Oriented","Remote", "On-site","Office/Data", "Hands-on/Field","Lab/Research","Creative/Design", "People-centric/Teaching", "Business", "freelance"]
     return templates.TemplateResponse("index.html", {"request": request, "work_styles": work_styles})
-
 # Chatbot API
 @app.post("/ask")
 async def ask_question(data: dict):
-    try:
-        q = data.get("question")
-        logger.info(f"Received question: {q}")
-        response = career_system.ask_question(q)
-        return {"answer": response["answer"]}
+    global career_system
+    q = data.get("question")
+    if not career_system or not career_system.client:
+        return {"answer": "Weaviate not initialized."}
+    response = career_system.ask_question(q)
+    return {"answer": response["answer"]}
     except Exception as e:
         logger.error(f"Error in ask_question: {e}")
         return {"answer": "Sorry, I'm having trouble processing your question right now."}
