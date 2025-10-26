@@ -1,30 +1,37 @@
-# Use a lightweight Python image
+# Dockerfile
 FROM python:3.11-slim
 
-# Set working directory inside the container
 WORKDIR /app
 
-# Copy dependency file
+# Install system dependencies only for building
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install dependencies
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire app folder into the container
-COPY app ./app
-COPY models ./models
-COPY app/final_merged_career_guidance.csv ./app/final_merged_career_guidance.csv
+# Remove build dependencies to reduce image size
+RUN apt-get remove -y gcc g++ && apt-get autoremove -y
 
-# Copy the .env file if you want to use it locally (Render uses environment variables instead)
-#COPY .env .env
+# Copy application code
+COPY app/ ./app/
+COPY models/ ./models/
 
-# Expose FastAPI port
-EXPOSE 8000
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
 
-# Set environment variables (Render overrides these automatically)
-ENV PYTHONUNBUFFERED=1
+# Expose port (Render uses 10000 by default)
+EXPOSE 10000
 
-# Command to start the FastAPI server
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:10000/ || exit 1
 
-
+# Command to run the application
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]
