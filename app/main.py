@@ -22,10 +22,7 @@ career_system.initialize_system("app/final_merged_career_guidance.csv")
 @app.get("/health")
 def health():
     return {"status": "ok"}
-<<<<<<< HEAD
 
-=======
->>>>>>> 20e9b2743e5dee7a1f93a29262def00923205a33
 # Home page - ML Recommendation
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
