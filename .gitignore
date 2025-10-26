@@ -47,7 +47,3 @@ Thumbs.db
 # Logs
 *.log
 
-
-
-# Dataset (if it's large)
-final_merged_career_guidance.csv
