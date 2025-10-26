@@ -47,9 +47,7 @@ Thumbs.db
 # Logs
 *.log
 
-# Models (if they're large)
-models/models/
-!models/models/.gitkeep
+
 
 # Dataset (if it's large)
 final_merged_career_guidance.csv
