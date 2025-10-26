@@ -16,3 +16,4 @@ joblib
 python-levenshtein
 sentence-transformers
 tiktoken
+python-multipart
