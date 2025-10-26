@@ -1,42 +1,73 @@
+import os
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from dotenv import load_dotenv
 import logging
+import uvicorn
+
+# Load environment variables FIRST
+load_dotenv()
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from app.utils.ml_utils import predict_major
-from app.rag_engine import CareerCompassWeaviate
-
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-templates = Jinja2Templates(directory="app/templates")
+# Mount static files with error handling
+try:
+    app.mount("/static", StaticFiles(directory="app/static"), name="static")
+except:
+    logger.warning("Static files directory not found")
 
-# Initialize RAG system
-career_system = CareerCompassWeaviate()
-career_system.initialize_system("app/final_merged_career_guidance.csv")
+try:
+    templates = Jinja2Templates(directory="app/templates")
+except:
+    logger.warning("Templates directory not found")
+
+# Initialize RAG system LAZILY (don't load on startup)
+career_system = None
+
+def get_career_system():
+    global career_system
+    if career_system is None:
+        try:
+            from app.rag_engine import CareerCompassWeaviate
+            career_system = CareerCompassWeaviate()
+            # Don't initialize the full system on import to save memory
+        except Exception as e:
+            logger.error(f"Failed to initialize career system: {e}")
+    return career_system
+
 @app.get("/health")
-def health():
-    return {"status": "ok"}
+async def health():
+    return {"status": "ok", "message": "Career Compass is running"}
+
+@app.get("/")
+async def root():
+    return {"message": "Career Compass API is running"}
 
 # Home page - ML Recommendation
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     work_styles = ["Team-Oriented","Remote", "On-site","Office/Data", "Hands-on/Field","Lab/Research","Creative/Design", "People-centric/Teaching", "Business", "freelance"]
     return templates.TemplateResponse("index.html", {"request": request, "work_styles": work_styles})
+
 # Chatbot API
 @app.post("/ask")
 async def ask_question(data: dict):
-    global career_system
-    q = data.get("question")
-    if not career_system or not career_system.client:
-        return {"answer": "Weaviate not initialized."}
-    response = career_system.ask_question(q)
-    return {"answer": response["answer"]}
+    try:
+        q = data.get("question")
+        logger.info(f"Received question: {q}")
+        
+        system = get_career_system()
+        if not system:
+            return {"answer": "Career guidance system is starting up. Please try again in a moment."}
+            
+        response = system.ask_question(q)
+        return {"answer": response["answer"]}
     except Exception as e:
         logger.error(f"Error in ask_question: {e}")
         return {"answer": "Sorry, I'm having trouble processing your question right now."}
@@ -57,12 +88,8 @@ async def predict(
     passion: str = Form("")
 ):
     try:
-        print(f"📥 Form data received:")
-        print(f"  RIASEC: R={R}, I={I}, A={A}, S={S}, E={E}, C={C}")
-        print(f"  Skills: {skills}")
-        print(f"  Courses: {courses}")
-        print(f"  Work Style: {work_style}")
-        print(f"  Passion: {passion}")
+        logger.info(f"📥 Form data received:")
+        logger.info(f"  RIASEC: R={R}, I={I}, A={A}, S={S}, E={E}, C={C}")
         
         # Convert checkbox values to boolean
         riasec = {
@@ -82,8 +109,9 @@ async def predict(
             "passion_text": passion
         }
 
+        from app.utils.ml_utils import predict_major
         result = predict_major(user_data)
-        print(f"📤 Sending response: {result}")
+        logger.info(f"📤 Prediction completed")
         
         if "error" in result:
             return JSONResponse({"success": False, "error": result["error"]})
@@ -92,9 +120,10 @@ async def predict(
             return JSONResponse(result)
             
     except Exception as e:
-        print(f"❌ Error in predict endpoint: {e}")
+        logger.error(f"❌ Error in predict endpoint: {e}")
         return JSONResponse({"success": False, "error": str(e)})
 
+# This is crucial for Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port)
