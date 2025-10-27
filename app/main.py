@@ -8,7 +8,7 @@ import os
 import uvicorn
 from dotenv import load_dotenv
 
-
+career_system = None
 load_dotenv()
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -41,11 +41,22 @@ async def home(request: Request):
 # Chatbot API
 @app.post("/ask")
 async def ask_question(data: dict):
+    global career_system
     try:
         q = data.get("question")
         logger.info(f"Received question: {q}")
+
+        if career_system is None:
+            logger.info("Initializing career system...")
+            career_system = CareerCompassWeaviate()
+            # Optionally initialize with data if needed
+            # base_dir = os.path.dirname(os.path.abspath(__file__))
+            # csv_path = os.path.join(base_dir, "final_merged_career_guidance.csv")
+            # career_system.initialize_system(csv_path)
+
         response = career_system.ask_question(q)
         return {"answer": response["answer"]}
+
     except Exception as e:
         logger.error(f"Error in ask_question: {e}")
         return {"answer": "Sorry, I'm having trouble processing your question right now."}
