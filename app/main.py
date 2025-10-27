@@ -1,77 +1,75 @@
-import os
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from dotenv import load_dotenv
+from app.utils.ml_utils import predict_major
 import logging
+import os
+import uvicorn
+from dotenv import load_dotenv
 
-# Load environment variables FIRST
 load_dotenv()
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+from app.utils.ml_utils import predict_major
+from app.rag_engine import CareerCompassWeaviate
 
-# Mount static files
-try:
-    app.mount("/static", StaticFiles(directory="app/static"), name="static")
-    templates = Jinja2Templates(directory="app/templates")
-except Exception as e:
-    logger.warning(f"Static/templates setup warning: {e}")
+app = FastAPI(title="Career Compass API")
 
-# Initialize RAG system LAZILY
+# Global variable for career system
 career_system = None
 
 def get_career_system():
-    """Lazy initialization of the career system"""
     global career_system
     if career_system is None:
         try:
-            from app.rag_engine import CareerCompassWeaviate
             career_system = CareerCompassWeaviate()
-            # Don't initialize the full system with data on import
-            logger.info("✅ Career system initialized (lazy loading)")
+            # Initialize with data path
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            csv_path = os.path.join(base_dir, "app", "data", "final_merged_career_guidance.csv")
+            
+            # Check if file exists
+            if os.path.exists(csv_path):
+                career_system.initialize_system(csv_path)
+                logger.info("Career system initialized successfully")
+            else:
+                logger.warning(f"CSV file not found at {csv_path}, RAG system will not work")
+                
         except Exception as e:
-            logger.error(f"❌ Failed to initialize career system: {e}")
-            career_system = None
+            logger.error(f"Failed to initialize career system: {e}")
     return career_system
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "message": "Career Compass is running"}
+# Mount static files
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+templates = Jinja2Templates(directory="app/templates")
 
-@app.get("/")
-async def root():
-    return {"message": "Career Compass API is running"}
-
-# Home page - ML Recommendation
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    work_styles = ["Team-Oriented","Remote", "On-site","Office/Data", "Hands-on/Field","Lab/Research","Creative/Design", "People-centric/Teaching", "Business", "freelance"]
+    work_styles = ["Team-Oriented", "Remote", "On-site", "Office/Data", "Hands-on/Field", "Lab/Research", "Creative/Design", "People-centric/Teaching", "Business", "freelance"]
     return templates.TemplateResponse("index.html", {"request": request, "work_styles": work_styles})
 
-# Chatbot API - FIXED: Use get_career_system() instead of career_system directly
+@app.get("/health")
+async def health_check():
+    return {"message": "Career Compass API is running", "status": "healthy"}
+
 @app.post("/ask")
 async def ask_question(data: dict):
     try:
         q = data.get("question")
         logger.info(f"Received question: {q}")
-        
-        # FIX: Use the getter function, not the direct variable
         system = get_career_system()
-        if not system:
-            return {"answer": "Career guidance system is currently unavailable. Please try again later."}
-            
-        response = system.ask_question(q)
-        return {"answer": response["answer"]}
+        if system and system.vectorstore:
+            response = system.ask_question(q)
+            return {"answer": response["answer"]}
+        else:
+            return {"answer": "Chatbot system is not fully initialized yet. Please try again later."}
     except Exception as e:
         logger.error(f"Error in ask_question: {e}")
         return {"answer": "Sorry, I'm having trouble processing your question right now."}
 
-# ML Prediction Endpoint
 @app.post("/predict")
 async def predict(
     request: Request,
@@ -98,8 +96,8 @@ async def predict(
             "passion_text": passion
         }
 
-        from app.utils.ml_utils import predict_major
         result = predict_major(user_data)
+        logger.info(f"Prediction result: {result}")
         
         if "error" in result:
             return JSONResponse({"success": False, "error": result["error"]})
@@ -111,7 +109,7 @@ async def predict(
         logger.error(f"Error in predict endpoint: {e}")
         return JSONResponse({"success": False, "error": str(e)})
 
-   
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # default to 5000
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
