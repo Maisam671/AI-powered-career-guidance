@@ -8,7 +8,6 @@ import os
 import uvicorn
 from dotenv import load_dotenv
 
-career_system = None
 load_dotenv()
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -22,16 +21,37 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
 
+# Initialize career_system globally
+career_system = None
+
 def get_career_system():
     global career_system
     if career_system is None:
         try:
-            from app.rag_engine import CareerCompassWeaviate
             career_system = CareerCompassWeaviate()
-            # Don't initialize full system on import to save memory
+            # Initialize the RAG system
+            dataset_paths = [
+                "app/final_merged_career_guidance.csv",
+                "final_merged_career_guidance.csv"
+            ]
+            for path in dataset_paths:
+                if os.path.exists(path):
+                    logger.info(f"Found dataset at: {path}")
+                    success = career_system.initialize_system(path)
+                    if success:
+                        logger.info("Career Compass RAG system ready.")
+                        break
+                    else:
+                        logger.error(f"Failed to initialize RAG system with {path}")
+                else:
+                    logger.warning(f"Dataset not found at: {path}")
+            else:
+                logger.error("No dataset file found in any location!")
         except Exception as e:
             logger.error(f"Failed to initialize career system: {e}")
+            career_system = None
     return career_system
+
 # Home page - ML Recommendation
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -41,22 +61,14 @@ async def home(request: Request):
 # Chatbot API
 @app.post("/ask")
 async def ask_question(data: dict):
-    global career_system
     try:
         q = data.get("question")
         logger.info(f"Received question: {q}")
-
-        if career_system is None:
-            logger.info("Initializing career system...")
-            career_system = CareerCompassWeaviate()
-            # Optionally initialize with data if needed
-            # base_dir = os.path.dirname(os.path.abspath(__file__))
-            # csv_path = os.path.join(base_dir, "final_merged_career_guidance.csv")
-            # career_system.initialize_system(csv_path)
-
-        response = career_system.ask_question(q)
+        system = get_career_system()
+        if system is None:
+            return {"answer": "Career guidance system is currently unavailable. Please try again later."}
+        response = system.ask_question(q)
         return {"answer": response["answer"]}
-
     except Exception as e:
         logger.error(f"Error in ask_question: {e}")
         return {"answer": "Sorry, I'm having trouble processing your question right now."}
@@ -101,6 +113,7 @@ async def predict(
     except Exception as e:
         logger.error(f"Error in predict endpoint: {e}")
         return JSONResponse({"success": False, "error": str(e)})
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # default to 5000
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
