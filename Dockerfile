@@ -1,33 +1,35 @@
-# Dockerfile
+# 1️⃣ Use official Python image
 FROM python:3.11-slim
 
+# 2️⃣ Environment variables
+# ENV PYTHONDONTWRITEBYTECODE=1
+# ENV PYTHONUNBUFFERED=1
+
+# 3️⃣ Install OS dependencies for OpenCV
+RUN apt-get update && apt-get install -y libgl1 libglib2.0-0
+
+# 4️⃣ Set working directory
 WORKDIR /app
 
-# Install only essential system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
-
-# Copy requirements first for better caching
+# 5️⃣ Copy requirements and install dependencies
 COPY requirements.txt .
 
-# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip
+
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY app/ ./app/
-COPY models/ ./models/
 
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
+# 6️⃣ Copy the rest of the project files
+# COPY app.py .
+# COPY best.pt .
+# COPY templates/ templates/
+# COPY static/ static/
 
-# Expose port (Render uses 10000 by default)
-EXPOSE 10000
+COPY . .
+# 7️⃣ Expose Flask port
+EXPOSE 5000
 
-# Simple health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:10000/health || exit 1
+# 8️⃣ Run Flask app
+# CMD ["gunicorn", "-b", "0.0.0.0:5000", "--workers", "1", "app:app"]
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000", "--workers", "1"]
+CMD ["python", "main.py"]
