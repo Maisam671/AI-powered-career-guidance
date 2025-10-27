@@ -8,19 +8,23 @@ import os
 import uvicorn
 from dotenv import load_dotenv
 
-
 load_dotenv()
+
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from app.utils.ml_utils import predict_major
-from app.rag_engine import CareerCompassWeaviate
-
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-templates = Jinja2Templates(directory="app/templates")
+# Mount static files
+try:
+    app.mount("/static", StaticFiles(directory="app/static"), name="static")
+    templates = Jinja2Templates(directory="app/templates")
+except Exception as e:
+    logger.warning(f"Static/templates setup warning: {e}")
+
+# Initialize RAG system LAZILY - DON'T initialize on import
+career_system = None
 
 def get_career_system():
     global career_system
@@ -29,10 +33,16 @@ def get_career_system():
             from app.rag_engine import CareerCompassWeaviate
             career_system = CareerCompassWeaviate()
             # Don't initialize full system on import to save memory
+            logger.info("✅ Career system initialized (lazy loading)")
         except Exception as e:
             logger.error(f"Failed to initialize career system: {e}")
+            career_system = None
     return career_system
 # Home page - ML Recommendation
+@app.get("/health")
+async def health():
+    return {"status": "ok", "message": "Career Compass is running"}
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     work_styles = ["Team-Oriented","Remote", "On-site","Office/Data", "Hands-on/Field","Lab/Research","Creative/Design", "People-centric/Teaching", "Business", "freelance"]
@@ -44,8 +54,16 @@ async def ask_question(data: dict):
     try:
         q = data.get("question")
         logger.info(f"Received question: {q}")
-        response = career_system.ask_question(q)
+        system = get_career_system()
         return {"answer": response["answer"]}
+        if not system:
+            return {"answer": "Career guidance system is currently unavailable. Please try again later."}
+            
+        response = system.ask_question(q)
+        return {"answer": response["answer"]}
+    except Exception as e:
+        logger.error(f"Error in ask_question: {e}")
+        return {"answer": "Sorry, I'm having trouble processing your question right now."}
     except Exception as e:
         logger.error(f"Error in ask_question: {e}")
         return {"answer": "Sorry, I'm having trouble processing your question right now."}
@@ -77,7 +95,7 @@ async def predict(
             "work_style": work_style,
             "passion_text": passion
         }
-
+        from app.utils.ml_utils import predict_major
         result = predict_major(user_data)
         logger.info(f"Prediction result: {result}")
         
