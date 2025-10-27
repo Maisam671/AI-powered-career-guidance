@@ -4,205 +4,295 @@ import numpy as np
 from fuzzywuzzy import process, fuzz
 from sklearn.preprocessing import MultiLabelBinarizer, OneHotEncoder, LabelEncoder
 
-logger = logging.getLogger(__name__)
-
-# Global models variable with lazy loading
-_models = None
-
-def get_models():
-    global _models
-    if _models is None:
-        logger.info("🔄 Loading ML models...")
-        _models = load_models()
-    return _models
-
+# Load all models and encoders
 def load_models():
-    """Load models with minimal memory footprint"""
+    models = {}
     try:
-        models = {}
-        base_path = "models/models/"
+        models['model'] = joblib.load('models/models/major_recommendation_model.pkl')
+        models['mlb_skills'] = joblib.load('models/models/mlb_skills.pkl')
+        models['mlb_courses'] = joblib.load('models/models/mlb_courses.pkl')
+        models['ohe_work_style'] = joblib.load('models/models/ohe_work_style.pkl')
+        models['ohe_passion'] = joblib.load('models/models/ohe_passion.pkl')
+        models['le_major'] = joblib.load('models/models/le_major.pkl')
+        models['le_faculty'] = joblib.load('models/models/le_faculty.pkl')
+        models['le_degree'] = joblib.load('models/models/le_degree.pkl')
+        models['le_campus'] = joblib.load('models/models/le_campus.pkl')
         
-        # Only load essential models
-        essential_models = [
-            'major_recommendation_model.pkl',
-            'mlb_skills.pkl', 
-            'mlb_courses.pkl',
-            'ohe_work_style.pkl',
-            'ohe_passion.pkl',
-            'le_major.pkl',
-            'le_faculty.pkl', 
-            'le_degree.pkl',
-            'le_campus.pkl',
-            'master_skills.pkl',
-            'master_courses.pkl',
-            'master_passions.pkl',
-            'master_work_styles.pkl'
-        ]
-        
-        for model_file in essential_models:
-            key = model_file.replace('.pkl', '').replace('master_', '')
-            if 'master_' in model_file:
-                key = f"all_{key}"
-            models[key] = joblib.load(f'{base_path}{model_file}')
-            logger.info(f"✅ Loaded {model_file}")
-        
-        logger.info("🎯 All ML models loaded successfully")
+        # Load master lists
+        models['all_skills'] = joblib.load('models/models/master_skills.pkl')
+        models['all_courses'] = joblib.load('models/models/master_courses.pkl')
+        models['all_passions'] = joblib.load('models/models/master_passions.pkl')
+        models['all_work_styles'] = joblib.load('models/models/master_work_styles.pkl')
+     
+        models['all_skills'].extend([
+                'Machine Learning', 'Artificial Intelligence', 'Robotics', 'Programming', 'Database Management',
+                'Cloud Computing', 'Biotechnology', 'Environmental Science', 'GIS', 'Engineering Design',
+                'Electronics', 'Renewable Energy', 'Lab Safety', 'Photography', 'Video Editing', 'Animation',
+                'UX/UI Design', 'Fashion Design', 'Illustration', 'Music Theory', 'Creative Writing',
+                'Storyboarding', 'Film Production', 'Problem Solving', 'Statistical Modeling',
+                'Research Methodology', 'Project Management', 'Decision Making', 'Risk Assessment',
+                'Mathematical Modeling', 'Data Visualization', 'Critical Reading', 'Logical Reasoning',
+                'Negotiation', 'Teamwork', 'Coaching', 'Conflict Resolution', 'Presentation Skills',
+                'Public Speaking', 'Active Listening', 'Cultural Competence', 'Emotional Intelligence',
+                'Customer Relationship Management', 'Spanish', 'French', 'German', 'Mandarin', 'Japanese',
+                'Copywriting', 'Editing', 'Technical Writing', 'Translation', 'Speech Writing', 'Blogging',
+                'Carpentry', 'Welding', 'Cooking', 'Gardening', 'Mechanical Repairs', 'Automotive Diagnostics',
+                'Electrical Wiring', 'Fitness Training', 'Yoga Instruction', 'Meditation Guidance',
+                'Meditation Techniques', 'Blockchain', 'Cybersecurity', 'Ethical Hacking', 'Networking Protocols',
+                'Mobile App Development', 'Web Development', 'SEO', 'Content Marketing', 'Branding',
+                'Public Relations', 'Event Planning', 'Fundraising', 'Sales Strategy', 'Market Research',
+                'Negotiation Skills', 'Customer Retention', 'Product Design', 'Industrial Design',
+                'Furniture Design', 'Ceramics', 'Pottery', 'Glassblowing', 'Textile Design', 'Fashion Illustration',
+                'Stage Design', 'Lighting Design', 'Sound Engineering', 'Acoustics', 'Meteorology', 'Oceanography',
+                'Geology', 'Astronomy', 'Astrophysics', 'Genetics', 'Microbiology', 'Pathology',
+                'Pharmacology', 'Nutrition', 'Food Science', 'Hospitality Management', 'Tourism Management',
+                'Travel Planning', 'Cartography', 'Urban Planning', 'Architecture', 'Interior Design',
+                'Landscape Design', 'Sports Coaching', 'Athletic Training', 'Martial Arts', 'First Responder Training',
+                'Emergency Management', 'Volunteer Coordination', 'Ethics', 'Philosophy', 'History', 'Sociology',
+                'Psychology', 'Anthropology', 'Political Science', 'Law', 'Criminology', 'Forensics', 'Linguistics',
+                'Sign Language', 'Calligraphy', 'Typography', 'Meditation', 'Mindfulness', 'Meditation Coaching',
+                'Self-defense', 'Survival Skills', 'Animal Care', 'Veterinary Knowledge', 'Aquaculture',
+                'Fishing Techniques', 'Hunting Skills', 'Power BI', 'PowerBI', 'Data Analysis', 'Data Analytics',
+                'Business Intelligence', 'Excel', 'Tableau'
+        ])
+
+        models['all_skills']= list(set(models['all_skills']))
+        joblib.dump(models['all_skills'], 'models/models/master_skills.pkl')
+     
+        print("\n✅ Master skills updated successfully!")
+        print("Sample after update:", models['all_skills'][:60])
+
+        #updating the courses list 
+        models['all_courses'].extend([
+            'Algebra', 'Geometry', 'Trigonometry', 'Calculus', 'Statistics', 'Probability', 
+            'Linear Algebra', 'Discrete Mathematics', 'Differential Equations', 'Math', 'Mathematics'
+
+            # Sciences
+            'Biology', 'Chemistry', 'Physics', 'Earth Science', 'Environmental Science', 
+            'Astronomy', 'Genetics', 'Microbiology', 'Botany', 'Zoology', 'Anatomy', 'Physiology',
+
+            # Languages
+            'English', 'Arabic', 'French', 'Spanish', 'German', 'Mandarin', 'Japanese', 'Creative Writing',
+            
+            # Social Studies / Humanities
+            'History', 'World History', 'Geography', 'Economics', 'Political Science', 'Sociology', 'Psychology', 
+            'Anthropology', 'Philosophy', 'Ethics', 'Law', 'Civics',
+
+            # Arts
+            'Art', 'Drawing', 'Painting', 'Sculpting', 'Music', 'Theater', 'Dance', 'Photography', 'Calligraphy', 
+            'Graphic Design', 'Design and Technology',
+
+            # Physical Education
+            'Physical Education', 'Health Education', 'Sports', 'Yoga', 'Martial Arts',
+
+            # Technology / Practical Skills
+            'Computer Science', 'Information Technology', 'Basic Programming', 'Digital Literacy', 
+            'Electronics', 'Engineering Basics', 'Mechanics', 'Home Economics', 'Food and Nutrition', 'Stem Education', 'Robotics',
+            
+            'Introduction to Computer Science', 'Programming Fundamentals', 'Python Programming', 
+            'Java Programming', 'C++ Programming', 'Data Science Fundamentals', 'Machine Learning',
+            'Deep Learning', 'Artificial Intelligence', 'Robotics Engineering', 'Database Management Systems',
+            'Cloud Computing Basics', 'Cybersecurity Fundamentals', 'Web Development', 'Mobile App Development',
+            'Networking Protocols', 'SEO & Content Marketing', 'UX/UI Design', 'Animation Techniques', 'Video Editing',
+            
+            # Engineering & Science
+            'Engineering Design Principles', 'Electronics 101', 'Renewable Energy Technologies', 
+            'Environmental Science', 'Biotechnology', 'GIS Mapping', 'Lab Safety', 'Chemistry', 'Physics', 
+            'Biology', 'Genetics', 'Microbiology', 'Astrophysics', 'Geology', 'Oceanography', 'Meteorology',
+            'Food Science', 'Nutrition', 'Pharmacology', 'Pathology', 'Forensic Science',
+            
+            # Mathematics
+            'Algebra', 'Geometry', 'Trigonometry', 'Calculus', 'Statistics', 'Probability', 'Discrete Mathematics', 
+            'Linear Algebra', 'Differential Equations', 'Mathematical Modeling', 'Data Visualization',
+            
+            # Humanities & Social Sciences
+            'History', 'World History', 'Philosophy', 'Ethics', 'Political Science', 'Economics', 'Sociology',
+            'Psychology', 'Anthropology', 'Law', 'Criminology', 'Public Speaking', 'Negotiation Skills',
+            
+            # Arts & Creative
+            'Art History', 'Drawing', 'Painting', 'Sculpting', 'Photography Basics', 'Music Theory', 
+            'Creative Writing', 'Film Production', 'Stage Design', 'Fashion Design', 'Illustration',
+            'Calligraphy', 'Typography', 'Interior Design', 'Landscape Design',
+            
+            # Practical / Vocational
+            'Carpentry', 'Welding', 'Gardening', 'Mechanical Repairs', 'Automotive Diagnostics', 
+            'Electrical Wiring', 'Sports Coaching', 'Fitness Training', 'Yoga Instruction', 
+            'Martial Arts', 'First Responder Training', 'Emergency Management', 'Volunteer Coordination',
+            
+            # Business & Management
+            'Project Management', 'Decision Making and Strategy', 'Leadership Skills', 
+            'Marketing Fundamentals', 'Event Planning', 'Hospitality Management', 'Tourism Management',
+            'Sales Strategy', 'Fundraising', 'Customer Relationship Management'])
+        models['all_courses']= list(set(models['all_courses']))
+        joblib.dump(models['all_courses'], 'models/models/master_courses.pkl')
+        print("\n✅ Master courses updated successfully!")
+        print("Sample after update:", models['all_courses'][:60])
+        models['all_passions'].extend([
+                # Arts & Creativity
+                'Drawing', 'Painting', 'Sculpting', 'Photography', 'Video Editing', 'Film Making', 'Theater', 
+                'Music', 'Singing', 'Playing an Instrument', 'Dance', 'Fashion', 'Design', 'Digital Art', 
+                'Graphic Design', 'Animation', 'Storytelling', 'Creative Writing', 'Poetry', 'Calligraphy', 
+                'Stage Design', 'Interior Design', 'Landscape Design', 'Ceramics', 'Pottery', 'Crafts', 'DIY Projects',
+
+                # Science & Technology
+                'Robotics', 'Astronomy', 'Space Exploration', 'Physics', 'Chemistry', 'Biology', 'Genetics', 
+                'Environmental Science', 'Climate Change', 'Mathematics', 'Statistics', 'Computer Science', 
+                'Programming', 'Artificial Intelligence', 'Machine Learning', 'Data Science', 'Electronics', 
+                'Engineering', 'Renewable Energy', 'Blockchain', 'Cybersecurity', 'Web Development', 
+                'Mobile App Development', '3D Printing', 'Tech Gadgets', 'Technology', 'Search', 'Research',
+
+                # Sports & Physical Activities
+                'Football', 'Basketball', 'Tennis', 'Swimming', 'Running', 'Cycling', 'Hiking', 'Climbing', 
+                'Martial Arts', 'Yoga', 'Meditation', 'Fitness', 'Gym Training', 'Pilates', 'Surfing', 
+                'Skiing', 'Skating', 'Horse Riding', 'Rock Climbing', 'Team Sports', 'Outdoor Adventures',
+
+                # Social & Community
+                'Volunteering', 'Social Activism', 'Community Service', 'Fundraising', 'Event Planning', 
+                'Leadership', 'Mentoring', 'Coaching', 'Public Speaking', 'Debating', 'Negotiation', 
+                'Cultural Exchange', 'Networking', 'Human Rights', 'Environmental Activism', 'Politics', 
+                'Student Council', 'Teaching', 'Tutoring', 'Youth Programs', 'Animal Rescue', 'Animal Care',
+
+                # Personal Development & Hobbies
+                'Reading', 'Book Clubs', 'Writing Blogs', 'Journaling', 'Traveling', 'Learning Languages', 
+                'Photography', 'Gardening', 'Cooking', 'Baking', 'Nutrition', 'Mindfulness', 'Meditation Coaching', 
+                'Self-defense', 'Survival Skills', 'Fishing', 'Hunting', 'Aquaculture', 'Home Improvement', 
+                'Pet Care', 'Fashion Styling', 'Interior Decorating', 'Collecting', 'Chess', 'Puzzles', 
+                'Board Games', 'Video Games', 'Virtual Reality',
+
+                # Career & Professional Interests
+                'Entrepreneurship', 'Startups', 'Business Management', 'Marketing', 'Sales', 'Customer Service', 
+                'Finance', 'Economics', 'Law', 'Criminology', 'Forensics', 'Psychology', 'Counseling', 
+                'Human Resources', 'Hospitality Management', 'Tourism', 'Travel Planning', 'Event Management', 
+                'Research', 'Laboratory Work', 'Project Management', 'Strategy', 'Data Analysis', 'Innovation'
+            ])
+
+
+        # Remove duplicates
+        models['all_passions'] = list(set(models['all_passions']))
+
+        # Save updated passions
+        joblib.dump(models['all_passions'], 'models/models/master_passions.pkl')
+
+        print("\n✅ Master passions updated successfully!")
+        print("Sample after update:", models['all_passions'][:60])             
         return models
-        
     except Exception as e:
-        logger.error(f"❌ Error loading models: {e}")
+        print(f"Error loading models: {e}")
         return None
 
+models = load_models()
 
-def process_user_text_input(user_input, master_list, input_type="skills"):
+def process_user_text_input(user_input, master_list, threshold=70):
     """
-    Enhanced text processing with better handling of comma-separated values
+    Enhanced text processing with better spelling mistake handling.
+    Uses multiple fuzzy matching strategies to catch spelling errors.
     """
     if not user_input or not isinstance(user_input, str):
         return []
     
     detected_items = set()
     
-    print(f"🔍 Processing {input_type} input: '{user_input}'")
-    
-    # Clean and normalize the input
-    user_input = user_input.strip()
-    
-    # Handle comma-separated values more intelligently
-    tokens = []
-    if ',' in user_input:
-        # Split by commas but be careful with spaces
-        parts = [part.strip() for part in user_input.split(',')]
-        tokens.extend(parts)
-    else:
-        # Also split by spaces for single entries
-        tokens = [user_input]
-    
-    # Remove empty tokens
-    tokens = [token for token in tokens if token and len(token) > 1]
-    
-    print(f"   Tokens extracted: {tokens}")
+    # Split by commas, semicolons, or newlines
+    tokens = re.split(r'[,\n;]+', user_input.lower())
     
     for token in tokens:
         token = token.strip()
-        if not token:
+        if not token or len(token) < 2:  # Skip very short tokens
             continue
-            
-        print(f"   🔎 Matching token: '{token}'")
         
-        # Strategy 1: Exact match (case-insensitive)
-        exact_matches = [item for item in master_list if token.lower() == item.lower()]
+        print(f"🔍 Processing token: '{token}'")
+        
+        # Strategy 1: Try exact match first (case-insensitive)
+        exact_matches = [item for item in master_list if token == item.lower()]
         if exact_matches:
             detected_items.update(exact_matches)
-            print(f"      ✅ Exact match: {exact_matches}")
+            print(f"   ✅ Exact match found: {exact_matches}")
             continue
         
-        # Strategy 2: Partial match
-        partial_matches = [item for item in master_list if token.lower() in item.lower() or item.lower() in token.lower()]
+        # Strategy 2: Try partial match (contains)
+        partial_matches = [item for item in master_list if token in item.lower() or item.lower() in token]
         if partial_matches:
-            # Take the best partial match (longest or most specific)
-            best_match = max(partial_matches, key=len)
-            detected_items.add(best_match)
-            print(f"      ✅ Partial match: {best_match}")
+            detected_items.update(partial_matches)
+            print(f"   ✅ Partial match found: {partial_matches}")
             continue
         
-        # Strategy 3: Fuzzy matching with multiple approaches
-        # Try WRatio first (balanced approach)
-        matches = process.extract(token, master_list, scorer=fuzz.WRatio, limit=10)
-        for match, score in matches:
-            if score >= 75:  # Good balance for spelling errors
+        # Strategy 3: Use multiple fuzzy matching approaches with different thresholds
+        
+        # Approach A: Token set ratio (good for word order changes)
+        matches_a = process.extract(token, master_list, scorer=fuzz.token_set_ratio, limit=5)
+        for match, score in matches_a:
+            if score >= max(threshold, 80):  # Higher threshold for this scorer
                 detected_items.add(match)
-                print(f"      ✅ Fuzzy match: {match} (score: {score})")
-                break  # Take the best fuzzy match for this token
+                print(f"   ✅ TokenSet match: {match} (score: {score})")
+        
+        # Approach B: Partial ratio (good for partial matches and spelling errors)
+        matches_b = process.extract(token, master_list, scorer=fuzz.partial_ratio, limit=5)
+        for match, score in matches_b:
+            if score >= threshold:
+                detected_items.add(match)
+                print(f"   ✅ PartialRatio match: {match} (score: {score})")
+        
+        # Approach C: WRatio (weighted combination of methods)
+        matches_c = process.extract(token, master_list, scorer=fuzz.WRatio, limit=3)
+        for match, score in matches_c:
+            if score >= threshold:
+                detected_items.add(match)
+                print(f"   ✅ WRatio match: {match} (score: {score})")
     
+    # Final cleanup: Remove any very similar items to avoid duplicates
     final_items = list(detected_items)
-    print(f"🎯 Final {input_type}: {final_items}")
+    
+    print(f"🎯 Final detected items: {final_items}")
     return final_items
 
 def prepare_user_input(user_data):
     """
-    Prepare user input for prediction with extensive debugging
+    Prepare user input for prediction
     """
     if not models:
-        print("❌ Models not loaded!")
         return None, "Models not loaded"
-    
-    print(f"📥 Received user data: {user_data}")
     
     # Process RIASEC
     riasec_order = ['R', 'I', 'A', 'S', 'E', 'C']
-    riasec_values = [1 if user_data['riasec'].get(col, False) else 0 for col in riasec_order]
-    X_riasec = np.array([riasec_values])
-    print(f"🎭 RIASEC values: {dict(zip(riasec_order, riasec_values))}")
+    X_riasec = np.array([[user_data['riasec'].get(col, 0) for col in riasec_order]])
     
-    # Process Skills
-    skills_text = user_data.get('skills_text', '')
-    detected_skills = process_user_text_input(skills_text, models['all_skills'], "skills")
-    
-    # If no skills detected but we have text, try to extract individual words
-    if not detected_skills and skills_text:
-        print("🔄 Trying alternative skill extraction...")
-        # Extract individual words and try to match them
-        words = re.findall(r'\b\w+\b', skills_text.lower())
-        for word in words:
-            if len(word) > 3:  # Only consider words longer than 3 characters
-                matches = process.extract(word, models['all_skills'], scorer=fuzz.partial_ratio, limit=3)
-                for match, score in matches:
-                    if score >= 80:
-                        detected_skills.append(match)
-                        break
-        detected_skills = list(set(detected_skills))
-        print(f"🔄 Alternative skills detected: {detected_skills}")
-    
+    # Process Skills with NLP - get ALL detected skills
+    detected_skills = process_user_text_input(user_data['skills_text'], models['all_skills'], threshold=65)
+    print(f"🔍 Final detected skills: {detected_skills}")
     X_skills = models['mlb_skills'].transform([detected_skills])
-    print(f"🔧 Skills features shape: {X_skills.shape}")
     
-    # Process Courses
-    courses_text = user_data.get('courses_text', '')
-    detected_courses = process_user_text_input(courses_text, models['all_courses'], "courses")
+    # Process Courses with NLP - get ALL detected courses
+    detected_courses = process_user_text_input(user_data['courses_text'], models['all_courses'], threshold=65)
+    print(f"🔍 Final detected courses: {detected_courses}")
     X_courses = models['mlb_courses'].transform([detected_courses])
-    print(f"🔧 Courses features shape: {X_courses.shape}")
     
     # Process Work Style
-    work_style = user_data.get('work_style', '')
-    print(f"💼 Work style: {work_style}")
+    work_style = user_data['work_style']
     if work_style not in models['all_work_styles']:
-        work_style = models['all_work_styles'][0] if models['all_work_styles'] else 'Office/Data'
-        print(f"🔄 Using default work style: {work_style}")
+        work_style = models['all_work_styles'][0]
     X_work_style = models['ohe_work_style'].transform([[work_style]])
-    print(f"🔧 Work style features shape: {X_work_style.shape}")
     
-    # Process Passion
-    passion_text = user_data.get('passion_text', '')
-    detected_passions = process_user_text_input(passion_text, models['all_passions'], "passions")
-    passion = detected_passions[0] if detected_passions else (models['all_passions'][0] if models['all_passions'] else 'Technology')
-    print(f"❤️ Passion: {passion}")
+    # Process Passion with NLP - get ALL detected passions
+    detected_passions = process_user_text_input(user_data['passion_text'], models['all_passions'], threshold=65)
+    print(f"🔍 Final detected passions: {detected_passions}")
+    passion = detected_passions[0] if detected_passions else models['all_passions'][0]
     X_passion = models['ohe_passion'].transform([[passion]])
-    print(f"🔧 Passion features shape: {X_passion.shape}")
     
     # Combine all features
     X_user = np.hstack([X_riasec, X_skills, X_courses, X_work_style, X_passion])
-    print(f"🎯 Final feature vector shape: {X_user.shape}")
     
-    detected_info = {
+    return X_user, {
         'detected_skills': detected_skills,
         'detected_courses': detected_courses,
         'detected_passion': passion
     }
-    
-    print(f"📊 Detected info: {detected_info}")
-    
-    return X_user, detected_info
 
 def predict_major(user_data):
     """
     Predict major based on user input
     """
-    models = get_models()
     if not models:
         return {"error": "Models not loaded. Please train the model first."}
-    
-    print("🎯 Starting prediction...")
     
     # Prepare user input
     X_user, detected_info = prepare_user_input(user_data)
@@ -213,7 +303,6 @@ def predict_major(user_data):
     # Make prediction
     try:
         prediction = models['model'].predict(X_user)
-        print(f"🤖 Model prediction: {prediction}")
         
         # Decode predictions
         result = {
@@ -225,10 +314,7 @@ def predict_major(user_data):
             'success': True
         }
         
-        print(f"✅ Prediction result: {result}")
         return result
         
     except Exception as e:
-        error_msg = f"Prediction failed: {str(e)}"
-        print(f"❌ {error_msg}")
-        return {"error": error_msg, "success": False}
+        return {"error": f"Prediction failed: {str(e)}", "success": False}
