@@ -124,7 +124,5 @@ async def predict(
         return JSONResponse({"success": False, "error": str(e)})
 
 # This is crucial for Render
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port)
+if __name__ in "__main__":
+    app.run(host="0.0.0.0", port=5000,debug=False)
