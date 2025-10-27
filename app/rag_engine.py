@@ -124,3 +124,14 @@ def ask_question(self, question):
             "confidence": "Error",
             "retrieved_chunks": 0
         }
+if __name__ == "__main__":
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    csv_path = os.path.join(base_dir, "final_merged_career_guidance.csv")
+
+    print("📁 Looking for dataset at:", csv_path)
+
+    system = CareerCompassWeaviate()
+    system.initialize_system(csv_path)
+    response = system.ask_question("What skills are important for AI engineers?")
+    print("💡 Answer:", response["answer"])
+    system.close_connection()
