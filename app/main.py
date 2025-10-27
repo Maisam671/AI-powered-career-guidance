@@ -11,10 +11,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from app.utils.ml_utils import predict_major
 from app.rag_engine import CareerCompassWeaviate
 
 app = FastAPI(title="Career Compass API")
@@ -22,25 +21,43 @@ app = FastAPI(title="Career Compass API")
 # Global variable for career system
 career_system = None
 
-def get_career_system():
+def initialize_career_system():
+    """Initialize the career system on startup"""
     global career_system
-    if career_system is None:
-        try:
-            career_system = CareerCompassWeaviate()
-            # Initialize with data path
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            csv_path = os.path.join(base_dir, "app", "data", "final_merged_career_guidance.csv")
-            
-            # Check if file exists
-            if os.path.exists(csv_path):
-                career_system.initialize_system(csv_path)
-                logger.info("Career system initialized successfully")
+    try:
+        logger.info("🔄 Initializing Career Compass RAG System...")
+        career_system = CareerCompassWeaviate()
+        
+        # Find the CSV file - CORRECTED PATH
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        csv_path = os.path.join(base_dir, "final_merged_career_guidance.csv")
+        
+        logger.info(f"📁 Looking for dataset at: {csv_path}")
+        
+        if os.path.exists(csv_path):
+            logger.info("✅ Dataset found! Initializing RAG system...")
+            success = career_system.initialize_system(csv_path)
+            if success:
+                logger.info("✅ Career Compass RAG System initialized successfully!")
             else:
-                logger.warning(f"CSV file not found at {csv_path}, RAG system will not work")
-                
-        except Exception as e:
-            logger.error(f"Failed to initialize career system: {e}")
-    return career_system
+                logger.warning("⚠️ Career Compass RAG System initialization failed")
+                # Still try minimal initialization
+                career_system._initialize_minimal()
+        else:
+            # Initialize minimal system
+            logger.warning("📁 No dataset found, initializing minimal system")
+            career_system._initialize_minimal()
+            
+        # Health check
+        health = career_system.health_check()
+        logger.info(f"🏥 System Health: {health}")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize career system: {e}")
+        career_system = None
+
+# Initialize on startup
+initialize_career_system()
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -53,22 +70,41 @@ async def home(request: Request):
 
 @app.get("/health")
 async def health_check():
-    return {"message": "Career Compass API is running", "status": "healthy"}
+    """Health check endpoint"""
+    if career_system:
+        system_health = career_system.health_check()
+        return {
+            "message": "Career Compass API is running", 
+            "system_health": system_health,
+            "status": "healthy"
+        }
+    else:
+        return {
+            "message": "Career Compass API is running", 
+            "system_health": {"status": "uninitialized"},
+            "status": "degraded"
+        }
 
 @app.post("/ask")
 async def ask_question(data: dict):
+    """Chatbot endpoint"""
     try:
-        q = data.get("question")
-        logger.info(f"Received question: {q}")
-        system = get_career_system()
-        if system and system.vectorstore:
-            response = system.ask_question(q)
-            return {"answer": response["answer"]}
-        else:
-            return {"answer": "Chatbot system is not fully initialized yet. Please try again later."}
+        if not career_system:
+            return {"answer": "Career system is not available. Please try again later."}
+        
+        question = data.get("question", "").strip()
+        if not question:
+            return {"answer": "Please enter a question."}
+        
+        logger.info(f"❓ Received question: {question}")
+        response = career_system.ask_question(question)
+        
+        logger.info(f"✅ Response confidence: {response.get('confidence', 'Unknown')}")
+        return {"answer": response["answer"]}
+        
     except Exception as e:
-        logger.error(f"Error in ask_question: {e}")
-        return {"answer": "Sorry, I'm having trouble processing your question right now."}
+        logger.error(f"❌ Error in ask_question: {e}")
+        return {"answer": "Sorry, I'm having trouble processing your question right now. Please try again."}
 
 @app.post("/predict")
 async def predict(
@@ -84,8 +120,9 @@ async def predict(
     work_style: str = Form(""),
     passion: str = Form("")
 ):
+    """ML prediction endpoint"""
     try:
-        logger.info(f"Received prediction request")
+        logger.info("📊 Received prediction request")
         
         riasec = {"R": bool(R), "I": bool(I), "A": bool(A), "S": bool(S), "E": bool(E), "C": bool(C)}
         user_data = {
@@ -97,7 +134,7 @@ async def predict(
         }
 
         result = predict_major(user_data)
-        logger.info(f"Prediction result: {result}")
+        logger.info(f"🎯 Prediction result: {result}")
         
         if "error" in result:
             return JSONResponse({"success": False, "error": result["error"]})
@@ -106,9 +143,8 @@ async def predict(
             return JSONResponse(result)
             
     except Exception as e:
-        logger.error(f"Error in predict endpoint: {e}")
+        logger.error(f"❌ Error in predict endpoint: {e}")
         return JSONResponse({"success": False, "error": str(e)})
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # default to 5000
