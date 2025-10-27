@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from utils.ml_utils import predict_major
+from .utils.ml_utils import predict_major
 import logging
 import os
 import uvicorn
@@ -14,7 +14,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from rag_engine import CareerCompassWeaviate
+from .rag_engine import CareerCompassWeaviate
 
 app = FastAPI(title="Career Compass API")
 
