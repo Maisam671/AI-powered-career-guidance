@@ -3,77 +3,73 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from app.utils.ml_utils import predict_major
+from app.rag_engine import CareerCompassWeaviate
+from dotenv import load_dotenv
 import logging
 import os
 import uvicorn
-from dotenv import load_dotenv
 
 load_dotenv()
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
+
+# -------------------- LOGGING SETUP --------------------
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from app.utils.ml_utils import predict_major
-from app.rag_engine import CareerCompassWeaviate
-
+# -------------------- FASTAPI APP ----------------------
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
-
 templates = Jinja2Templates(directory="app/templates")
 
-# Initialize career_system globally
-career_system = None
+# -------------------- GLOBAL VAR -----------------------
+career_system = None  # <-- this is the key line!!
 
+# -------------------- HELPER FUNCTION ------------------
 def get_career_system():
     global career_system
     if career_system is None:
         try:
+            logger.info("🔄 Initializing CareerCompassWeaviate...")
             career_system = CareerCompassWeaviate()
-            # Initialize the RAG system
-            dataset_paths = [
-                "app/final_merged_career_guidance.csv",
-                "final_merged_career_guidance.csv"
-            ]
-            for path in dataset_paths:
-                if os.path.exists(path):
-                    logger.info(f"Found dataset at: {path}")
-                    success = career_system.initialize_system(path)
-                    if success:
-                        logger.info("Career Compass RAG system ready.")
-                        break
-                    else:
-                        logger.error(f"Failed to initialize RAG system with {path}")
-                else:
-                    logger.warning(f"Dataset not found at: {path}")
-            else:
-                logger.error("No dataset file found in any location!")
+            # Optional initialization if you have a CSV:
+            # base_dir = os.path.dirname(os.path.abspath(__file__))
+            # csv_path = os.path.join(base_dir, "final_merged_career_guidance.csv")
+            # career_system.initialize_system(csv_path)
+            logger.info("✅ Career system initialized successfully.")
         except Exception as e:
-            logger.error(f"Failed to initialize career system: {e}")
-            career_system = None
+            logger.error(f"❌ Failed to initialize career system: {e}")
+            return None
     return career_system
 
-# Home page - ML Recommendation
+# -------------------- ROUTES ---------------------------
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    work_styles = ["Team-Oriented","Remote", "On-site","Office/Data", "Hands-on/Field","Lab/Research","Creative/Design", "People-centric/Teaching", "Business", "freelance"]
+    work_styles = [
+        "Team-Oriented", "Remote", "On-site", "Office/Data", "Hands-on/Field",
+        "Lab/Research", "Creative/Design", "People-centric/Teaching",
+        "Business", "Freelance"
+    ]
     return templates.TemplateResponse("index.html", {"request": request, "work_styles": work_styles})
 
-# Chatbot API
+
 @app.post("/ask")
 async def ask_question(data: dict):
     try:
         q = data.get("question")
-        logger.info(f"Received question: {q}")
+        logger.info(f"💬 Received question: {q}")
+
         system = get_career_system()
-        if system is None:
-            return {"answer": "Career guidance system is currently unavailable. Please try again later."}
+        if not system:
+            return {"answer": "System failed to initialize."}
+
         response = system.ask_question(q)
-        return {"answer": response["answer"]}
+        logger.info(f"🧠 Response: {response}")
+        return {"answer": response.get("answer", "No answer generated.")}
+
     except Exception as e:
-        logger.error(f"Error in ask_question: {e}")
+        logger.exception("🔥 Error in /ask endpoint")
         return {"answer": "Sorry, I'm having trouble processing your question right now."}
 
-# ML Prediction Endpoint
+
 @app.post("/predict")
 async def predict(
     request: Request,
@@ -89,9 +85,9 @@ async def predict(
     passion: str = Form("")
 ):
     try:
-        logger.info(f"Received prediction request: R={R}, I={I}, A={A}, S={S}, E={E}, C={C}")
+        logger.info(f"🎯 Prediction Request: R={R}, I={I}, A={A}, S={S}, E={E}, C={C}")
         logger.info(f"Skills: {skills}, Courses: {courses}, Work Style: {work_style}, Passion: {passion}")
-        
+
         riasec = {"R": bool(R), "I": bool(I), "A": bool(A), "S": bool(S), "E": bool(E), "C": bool(C)}
         user_data = {
             "riasec": riasec,
@@ -102,18 +98,20 @@ async def predict(
         }
 
         result = predict_major(user_data)
-        logger.info(f"Prediction result: {result}")
-        
+        logger.info(f"📊 Prediction result: {result}")
+
         if "error" in result:
             return JSONResponse({"success": False, "error": result["error"]})
         else:
             result["success"] = True
             return JSONResponse(result)
-            
+
     except Exception as e:
-        logger.error(f"Error in predict endpoint: {e}")
+        logger.exception("🔥 Error in /predict endpoint")
         return JSONResponse({"success": False, "error": str(e)})
 
+
+# -------------------- SERVER ENTRY ---------------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # default to 5000
+    port = int(os.environ.get("PORT", 5000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
