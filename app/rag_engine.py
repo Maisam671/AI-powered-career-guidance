@@ -62,9 +62,10 @@ class CareerCompassWeaviate:
         """Ensure the schema (CareerKnowledge) exists"""
         try:
             class_name = "CareerKnowledge"
-            schema = self.client.collections.list_all()
+            collections = self.client.collections.list_all()
+            collection_names = [col.name for col in collections]
 
-            if class_name not in schema:
+            if class_name not in collection_names:
                 print("📋 Creating Weaviate schema...")
                 self.client.collections.create(
                     name=class_name,
@@ -164,7 +165,7 @@ class CareerCompassWeaviate:
             if not self.vectorstore:
                 return {"answer": "System not initialized.", "confidence": "Error"}
 
-            results = self.vectorstore.similarity_search(query=question, k=5)
+            results = self.vectorstore.similarity_search(query=question, k=3)
 
             if not results:
                 return {"answer": "I don't have enough information about that topic. Please try asking about university majors, career paths, or skills development.", "confidence": "Low"}
@@ -187,7 +188,7 @@ class CareerCompassWeaviate:
                 model="gpt-3.5-turbo",  # Use cheaper model to save costs
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
-                max_tokens=300
+                max_tokens=200
             )
 
             final_answer = response.choices[0].message.content.strip()
