@@ -126,8 +126,5 @@ async def predict(
 # This is crucial for Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-<<<<<<< HEAD
+
     uvicorn.run("app.main:app", host="0.0.0.0", port=port)
-=======
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port)
->>>>>>> 55870b9 (new)
