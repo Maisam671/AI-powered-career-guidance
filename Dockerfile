@@ -32,4 +32,5 @@ EXPOSE 5000
 # 8️⃣ Run Flask app
 # CMD ["gunicorn", "-b", "0.0.0.0:5000", "--workers", "1", "app:app"]
 
-CMD ["python", "main.py"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
