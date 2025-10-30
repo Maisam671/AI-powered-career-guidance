@@ -1,6 +1,15 @@
 import os
 import pandas as pd
 import weaviate
+from weaviate.auth import AuthApiKey
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain.docstore.document import Document
+from langchain.text_splitter import TokenTextSplitter
+from openai import OpenAI
+from dotenv import load_dotenv
+import os
+import pandas as pd
+import weaviate
 from weaviate.classes.init import Auth
 from weaviate.classes.config import Property, DataType
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -9,29 +18,14 @@ from langchain.docstore.document import Document
 from langchain.text_splitter import TokenTextSplitter
 from openai import OpenAI
 import os
-import logging
-from dotenv import load_dotenv
-
-load_dotenv() 
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+load_dotenv()
+llm_client = OpenAI()
 
 class CareerCompassWeaviate:
     def __init__(self):
         self.client = None
         self.vectorstore = None
-        self._llm_client = None
-    
-    def _get_llm_client(self):
-        """Lazy initialization of OpenAI client"""
-        if self._llm_client is None:
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("OPENAI_API_KEY environment variable is not set")
-            self._llm_client = OpenAI(api_key=api_key)
-        return self._llm_client
+        self.llm_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     
     # --- 1️⃣ Connect to Weaviate Cloud ---
     def _initialize_weaviate_client(self):
@@ -39,12 +33,9 @@ class CareerCompassWeaviate:
         try:
             cluster_url = os.getenv("WEAVIATE_CLOUD_URL")
             api_key = os.getenv("WEAVIATE_API_KEY")
-            if not cluster_url:
-                raise ValueError("WEAVIATE_CLOUD_URL environment variable is not set")
-            if not api_key:
-                raise ValueError("WEAVIATE_API_KEY environment variable is not set")
+
             print(f"🔗 Connecting to Weaviate Cloud: {cluster_url}")
-            
+            print("📂 Current working directory:", os.getcwd())
             self.client = weaviate.connect_to_weaviate_cloud(
                 cluster_url=cluster_url,
                 auth_credentials=Auth.api_key(api_key)
@@ -101,10 +92,6 @@ class CareerCompassWeaviate:
             return False
 
         try:
-            if not os.path.exists(data_path):
-                print(f"❌ Data file not found: {data_path}")
-                return False
-                
             df = pd.read_csv(data_path)
             print(f"📄 Loaded {len(df)} rows from CSV")
         except Exception as e:
@@ -113,7 +100,7 @@ class CareerCompassWeaviate:
 
         # Chunk text
         print("✂️ Splitting text into token chunks...")
-        text_splitter = TokenTextSplitter(chunk_size=2000, chunk_overlap=50)
+        text_splitter = TokenTextSplitter(chunk_size=200, chunk_overlap=20)
 
         documents = []
         for _, row in df.iterrows():
@@ -186,8 +173,7 @@ class CareerCompassWeaviate:
             Answer:
             """
 
-            llm_client = self._get_llm_client()
-            response = llm_client.chat.completions.create(
+            response = self.llm_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
@@ -202,7 +188,6 @@ class CareerCompassWeaviate:
             }
 
         except Exception as e:
-            print(f"❌ Error in ask_question: {e}")
             return {"answer": f"Error: {e}", "confidence": "Error"}
 
     # --- 5️⃣ Cleanup ---
