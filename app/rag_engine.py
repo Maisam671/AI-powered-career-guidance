@@ -19,7 +19,7 @@ from langchain.text_splitter import TokenTextSplitter
 from openai import OpenAI
 import os
 load_dotenv()
-llm_client = OpenAI()
+
 
 class CareerCompassWeaviate:
     def __init__(self):
